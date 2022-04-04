@@ -256,6 +256,36 @@ def _git_push_deployment_config_repo(
         )
 
 
+def _argocd_sign_in(
+        argocd_api,
+        username,
+        password,
+        insecure=False
+):
+    """Signs into ArgoCD CLI.
+
+    Raises
+    ------
+    StepRunnerException
+        If error signing into ArgoCD CLI.
+    """
+    try:
+        insecure_flag = None
+        if insecure:
+            insecure_flag = '--insecure'
+
+        sh.argocd.login(  # pylint: disable=no-member
+            argocd_api,
+            f'--username={username}',
+            f'--password={password}',
+            insecure_flag,
+            _out=sys.stdout,
+            _err=sys.stderr
+        )
+    except sh.ErrorReturnCode as error:
+        raise f"Error logging in to ArgoCD: {error}"
+
+
 def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
     results = {}
@@ -280,6 +310,11 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     git_password = ''
 
     environment = 'DEV'
+
+    argocd_api=''
+    argocd_username=''
+    argocd_password=''
+    argocd_skip_tls= ''
 
     results['argocd-app-name'] = 'argocd_app_name'
     results['container-image-deployed-address'] = container_image_address
@@ -332,11 +367,11 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
         # create/update argocd app and sync it
         print("Sign into ArgoCD")
-        self._argocd_sign_in(
-            argocd_api=self.get_value('argocd-api'),
-            username=self.get_value('argocd-username'),
-            password=self.get_value('argocd-password'),
-            insecure=self.get_value('argocd-skip-tls')
+        _argocd_sign_in(
+            argocd_api=argocd_api,
+            username=argocd_username,
+            password=argocd_password,
+            insecure=argocd_skip_tls
         )
 
         add_or_update_target_cluster = self.get_value('argocd-add-or-update-target-cluster')
