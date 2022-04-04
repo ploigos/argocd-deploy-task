@@ -3,21 +3,7 @@ import sh
 import sys
 import re
 
-
 GIT_REPO_REGEX = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)")
-
-
-def create_working_dir_sub_dir(work_dir_path, sub_dir_relative_path=""):
-    """Create a folder under the working/stepname folder.
-
-    Returns
-    -------
-    str
-        Path to created working sub directory.
-    """
-    file_path = os.path.join(work_dir_path, sub_dir_relative_path)
-    os.makedirs(file_path, exist_ok=True)
-    return file_path
 
 
 def clone_repo( # pylint: disable=too-many-arguments
@@ -77,7 +63,7 @@ def clone_repo( # pylint: disable=too-many-arguments
             _err=sys.stderr
         )
     except sh.ErrorReturnCode as error:
-        raise f"Error cloning repository ({repo_url}): {error}"
+        raise RuntimeError(f"Error cloning repository ({repo_url}): {error}") from error
 
     try:
         # no atomic way in git to checkout out new or existing branch,
@@ -99,7 +85,9 @@ def clone_repo( # pylint: disable=too-many-arguments
             )
     except sh.ErrorReturnCode as error:
         # NOTE: this should never happen
-        raise f"Unexpected error checking out new or existing branch ({repo_branch}) from repository ({repo_url}): {error}"
+        raise RuntimeError(
+            f"Unexpected error checking out new or existing branch ({repo_branch}) from repository ({repo_url}): {error}"
+        ) from error
 
     try:
         sh.git.config( # pylint: disable=no-member
@@ -118,41 +106,17 @@ def clone_repo( # pylint: disable=too-many-arguments
         )
     except sh.ErrorReturnCode as error:
         # NOTE: this should never happen
-        raise (
+        raise RuntimeError(
             f"Unexpected error configuring git user.email ({git_email})"
             f" and user.name ({git_name}) for repository ({repo_url})"
             f" in directory ({repo_dir}): {error}"
-        )
+        ) from error
 
     return repo_dir
 
 
 def _update_yaml_file_value(work_dir_path, file, yq_path, value):
-    """Update a YAML file using YQ.
-
-    Parameters
-    ----------
-    file : str
-        Path to file to update.
-    yq_path : str
-        YQ path to the value to update.
-    value: str
-        value to update the `yq_path`
-
-    Returns
-    -------
-    str
-        Path to the file to update.
-
-    Raises
-    ------
-    StepRunnerException
-        If error updating file.
-    """
-    # NOTE: use a YQ script to update so that comment can be injected
-    # TODO: update to YQ 4 and drop script file (and associated python parameters)
-
-    # inplace update the file
+    # Use the yq command to update the file
     try:
         sh.yq.eval( # pylint: disable=no-member
             f'{yq_path} = "{value}"',
@@ -160,10 +124,10 @@ def _update_yaml_file_value(work_dir_path, file, yq_path, value):
             '--inplace'
         )
     except sh.ErrorReturnCode as error:
-        raise (
+        raise RuntimeError(
             f"Error updating YAML file ({file}) target ({yq_path}) with value ({value}):"
             f" {error}"
-        )
+        ) from error
 
     return file
 
@@ -178,10 +142,10 @@ def _git_commit_file(git_commit_message, file_path, repo_dir):
         )
     except sh.ErrorReturnCode as error:
         # NOTE: this should never happen
-        raise (
+        raise RuntimeError(
             f"Unexpected error adding file ({file_path}) to commit"
             f" in git repository ({repo_dir}): {error}"
-        )
+        ) from error
 
     try:
         sh.git.commit( # pylint: disable=no-member
@@ -214,10 +178,10 @@ def _git_push(repo_dir, url=None):
             _out=sys.stdout
         )
     except sh.ErrorReturnCode as error:
-        raise (
+        raise RuntimeError(
             f"Error pushing commits from repository directory ({repo_dir}) to"
             f" repository ({url}): {error}"
-        )
+        ) from error
 
 
 def _git_push_deployment_config_repo(
@@ -269,7 +233,8 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
 
         # clone the configuration repository
         print("Clone the configuration repository")
-        repo_dir = create_working_dir_sub_dir(work_dir_path, 'deployment-config-repo')
+        repo_dir = os.path.join(work_dir_path, 'deployment-config-repo')
+        os.makedirs(repo_dir, exist_ok=True)
         deployment_config_repo_dir = clone_repo(
             repo_dir= repo_dir,
             repo_url=deployment_config_repo,
@@ -300,7 +265,6 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
             repo_dir=deployment_config_repo_dir
         )
         print("Push the updated environment values file")
-        deployment_config_repo_tag = 'DO NOT USE'
         _git_push_deployment_config_repo(
             deployment_config_repo=deployment_config_repo,
             deployment_config_repo_dir=deployment_config_repo_dir,
