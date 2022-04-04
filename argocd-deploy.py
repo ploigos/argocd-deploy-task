@@ -1,3 +1,129 @@
+import os
+import sh
+import sys
+import re
+
+
+def create_working_dir_sub_dir(self, sub_dir_relative_path=""):
+    """Create a folder under the working/stepname folder.
+
+    Returns
+    -------
+    str
+        Path to created working sub directory.
+    """
+    file_path = os.path.join(self.work_dir_path, sub_dir_relative_path)
+    os.makedirs(file_path, exist_ok=True)
+    return file_path
+
+
+def clone_repo( # pylint: disable=too-many-arguments
+    repo_dir,
+    repo_url,
+    repo_branch,
+    git_email,
+    git_name,
+    username=None,
+    password=None
+):
+    """Clones and checks out the deployment configuration repository.
+
+    Parameters
+    ----------
+    repo_dir : str
+        Path to where to clone the repository
+    repo_uri : str
+        URI of the repository to clone.
+    git_email : str
+        email to use when performing git operations in the cloned repository
+    git_name : str
+        name to use when performing git operations in the cloned repository
+
+    Returns
+    -------
+    str
+        Path to the directory where the deployment configuration repository was cloned
+        and checked out.
+
+    Raises
+    ------
+    StepRunnerException
+    * if error cloning repository
+    * if error checking out branch of repository
+    * if error configuring repo user
+    """
+    repo_match = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)").match(repo_url)
+    repo_protocol = repo_match.groupdict()['protocol']
+    repo_address = repo_match.groupdict()['address']
+    # if deployment config repo uses http/https push using user/pass
+    # else push using ssh
+    if username and password and repo_protocol and re.match(
+            r'^http://|^https://',
+            repo_protocol
+    ):
+        repo_url_with_auth = \
+            f"{repo_protocol}{username}:{password}" \
+            f"@{repo_address}"
+    else:
+        repo_url_with_auth = repo_url
+    try:
+        sh.git.clone( # pylint: disable=no-member
+            repo_url_with_auth,
+            repo_dir,
+            _out=sys.stdout,
+            _err=sys.stderr
+        )
+    except sh.ErrorReturnCode as error:
+        raise f"Error cloning repository ({repo_url}): {error}"
+
+    try:
+        # no atomic way in git to checkout out new or existing branch,
+        # so first try to check out existing, if that doesn't work try new
+        try:
+            sh.git.checkout(  # pylint: disable=no-member
+                repo_branch,
+                _cwd=repo_dir,
+                _out=sys.stdout,
+                _err=sys.stderr
+            )
+        except sh.ErrorReturnCode:
+            sh.git.checkout(
+                '-b',
+                repo_branch,
+                _cwd=repo_dir,
+                _out=sys.stdout,
+                _err=sys.stderr
+            )
+    except sh.ErrorReturnCode as error:
+        # NOTE: this should never happen
+        raise f"Unexpected error checking out new or existing branch ({repo_branch}) from repository ({repo_url}): {error}"
+
+    try:
+        sh.git.config( # pylint: disable=no-member
+            'user.email',
+            git_email,
+            _cwd=repo_dir,
+            _out=sys.stdout,
+            _err=sys.stderr
+        )
+        sh.git.config( # pylint: disable=no-member
+            'user.name',
+            git_name,
+            _cwd=repo_dir,
+            _out=sys.stdout,
+            _err=sys.stderr
+        )
+    except sh.ErrorReturnCode as error:
+        # NOTE: this should never happen
+        raise (
+            f"Unexpected error configuring git user.email ({git_email})"
+            f" and user.name ({git_name}) for repository ({repo_url})"
+            f" in directory ({repo_dir}): {error}"
+        )
+
+    return repo_dir
+
+
 def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
     results = {}
@@ -15,6 +141,11 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     additional_helm_values_files = ''
     argocd_app_name = 'tekton-task-app'
 
+    git_email = ''
+    git_name = ''
+    git_username = ''
+    git_password = ''
+
     environment = 'DEV'
 
     results['argocd-app-name'] = 'argocd_app_name'
@@ -23,15 +154,15 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
         # clone the configuration repository
         print("Clone the configuration repository")
-        clone_repo_dir_name = 'deployment-config-repo'
-        deployment_config_repo_dir = self._clone_repo(
-            repo_dir=self.create_working_dir_sub_dir(clone_repo_dir_name),
+        repo_dir = create_working_dir_sub_dir('deployment-config-repo')
+        deployment_config_repo_dir = clone_repo(
+            repo_dir= repo_dir,
             repo_url=deployment_config_repo,
             repo_branch=deployment_config_repo_branch,
-            git_email=self.get_value('git-email'),
-            git_name=self.get_value('git-name'),
-            username = self.get_value('git-username'),
-            password = self.get_value('git-password')
+            git_email = git_email,
+            git_name= git_name,
+            username = git_username,
+            password = git_password
         )
 
         # update values file, commit it, push it, and tag it
