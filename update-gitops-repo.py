@@ -6,14 +6,14 @@ import re
 GIT_REPO_REGEX = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)")
 
 
-def clone_repo( # pylint: disable=too-many-arguments
-    repo_dir,
-    repo_url,
-    repo_branch,
-    git_email,
-    git_name,
-    username=None,
-    password=None
+def clone_repo(  # pylint: disable=too-many-arguments
+        repo_dir,
+        repo_url,
+        repo_branch,
+        git_email,
+        git_name,
+        username=None,
+        password=None
 ):
     """Clones and checks out the deployment configuration repository.
 
@@ -21,8 +21,8 @@ def clone_repo( # pylint: disable=too-many-arguments
     ----------
     repo_dir : str
         Path to where to clone the repository
-    repo_uri : str
-        URI of the repository to clone.
+    repo_url : str
+        URL of the repository to clone.
     git_email : str
         email to use when performing git operations in the cloned repository
     git_name : str
@@ -36,7 +36,7 @@ def clone_repo( # pylint: disable=too-many-arguments
 
     Raises
     ------
-    StepRunnerException
+    RuntimeError
     * if error cloning repository
     * if error checking out branch of repository
     * if error configuring repo user
@@ -56,7 +56,7 @@ def clone_repo( # pylint: disable=too-many-arguments
     else:
         repo_url_with_auth = repo_url
     try:
-        sh.git.clone( # pylint: disable=no-member
+        sh.git.clone(
             repo_url_with_auth,
             repo_dir,
             _out=sys.stdout,
@@ -90,14 +90,14 @@ def clone_repo( # pylint: disable=too-many-arguments
         ) from error
 
     try:
-        sh.git.config( # pylint: disable=no-member
+        sh.git.config(  # pylint: disable=no-member
             'user.email',
             git_email,
             _cwd=repo_dir,
             _out=sys.stdout,
             _err=sys.stderr
         )
-        sh.git.config( # pylint: disable=no-member
+        sh.git.config(  # pylint: disable=no-member
             'user.name',
             git_name,
             _cwd=repo_dir,
@@ -118,7 +118,7 @@ def clone_repo( # pylint: disable=too-many-arguments
 def _update_yaml_file_value(work_dir_path, file, yq_path, value):
     # Use the yq command to update the file
     try:
-        sh.yq.eval( # pylint: disable=no-member
+        sh.yq.eval(  # pylint: disable=no-member
             f'{yq_path} = "{value}"',
             file,
             '--inplace'
@@ -134,7 +134,7 @@ def _update_yaml_file_value(work_dir_path, file, yq_path, value):
 
 def _git_commit_file(git_commit_message, file_path, repo_dir):
     try:
-        sh.git.add( # pylint: disable=no-member
+        sh.git.add(  # pylint: disable=no-member
             file_path,
             _cwd=repo_dir,
             _out=sys.stdout,
@@ -148,7 +148,7 @@ def _git_commit_file(git_commit_message, file_path, repo_dir):
         ) from error
 
     try:
-        sh.git.commit( # pylint: disable=no-member
+        sh.git.commit(  # pylint: disable=no-member
             '--allow-empty',
             '--all',
             '--message', git_commit_message,
@@ -184,13 +184,13 @@ def _git_push(repo_dir, url=None):
         ) from error
 
 
-def _git_push_deployment_config_repo(
-        deployment_config_repo,
-        deployment_config_repo_dir,
+def _git_push_repo(
+        repo,
+        repo_dir,
         username,
         password
 ):
-    deployment_config_repo_match = GIT_REPO_REGEX.match(deployment_config_repo)
+    deployment_config_repo_match = GIT_REPO_REGEX.match(repo)
     deployment_config_repo_protocol = deployment_config_repo_match.groupdict()['protocol']
     deployment_config_repo_address = deployment_config_repo_match.groupdict()['address']
 
@@ -204,29 +204,27 @@ def _git_push_deployment_config_repo(
             f"{deployment_config_repo_protocol}{username}:{password}" \
             f"@{deployment_config_repo_address}"
         _git_push(
-            repo_dir=deployment_config_repo_dir,
+            repo_dir=repo_dir,
             url=deployment_config_repo_with_user_pass
         )
     else:
         _git_push(
-            repo_dir=deployment_config_repo_dir
+            repo_dir=repo_dir
         )
 
 
-def deploy(git_password, container_image_address):  # pylint: disable=too-many-locals, too-many-statements
-
+def update_yaml_in_repo(
+        repo,
+        file,
+        yq_path,
+        new_value,
+        git_username,
+        git_password,
+        git_name='Tekton',
+        git_email='tekton@example.com',
+        branch='main',
+):
     results = {}
-
-    # get input
-    deployment_config_repo = 'https://github.com/dwinchell-robot/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git'
-    deployment_config_repo_branch = 'main'
-    target_file = 'charts/reference-quarkus-mvn-deploy/values-DEV.yaml'
-    deployment_config_helm_chart_values_file_container_image_address_yq_path = '.image.tag'
-
-    git_email = 'tekton@example.com'
-    git_name = 'Tekton'
-    git_username = 'dwinchell-robot'
-
     work_dir_path = '.'
 
     try:
@@ -236,38 +234,38 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
         repo_dir = os.path.join(work_dir_path, 'deployment-config-repo')
         os.makedirs(repo_dir, exist_ok=True)
         deployment_config_repo_dir = clone_repo(
-            repo_dir= repo_dir,
-            repo_url=deployment_config_repo,
-            repo_branch=deployment_config_repo_branch,
-            git_email = git_email,
-            git_name= git_name,
-            username = git_username,
-            password = git_password
+            repo_dir=repo_dir,
+            repo_url=repo,
+            repo_branch=branch,
+            git_email=git_email,
+            git_name=git_name,
+            username=git_username,
+            password=git_password
         )
 
         # update values file, commit it, push it, and tag it
         print("Update the environment values file")
         deployment_config_helm_chart_environment_values_file_path = os.path.join(
             deployment_config_repo_dir,
-            target_file
+            file
         )
         _update_yaml_file_value(
-            work_dir_path = work_dir_path,
+            work_dir_path=work_dir_path,
             file=deployment_config_helm_chart_environment_values_file_path,
-            yq_path=deployment_config_helm_chart_values_file_container_image_address_yq_path,
-            value=container_image_address
+            yq_path=yq_path,
+            value=new_value
         )
 
         print("Commit the updated environment values file")
         _git_commit_file(
             git_commit_message=f'Updating values for deployment',
-            file_path=target_file,
+            file_path=file,
             repo_dir=deployment_config_repo_dir
         )
         print("Push the updated environment values file")
-        _git_push_deployment_config_repo(
-            deployment_config_repo=deployment_config_repo,
-            deployment_config_repo_dir=deployment_config_repo_dir,
+        _git_push_repo(
+            repo=repo,
+            repo_dir=deployment_config_repo_dir,
             username=git_username,
             password=git_password
         )
@@ -281,8 +279,16 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
 
 
 # Run the script
-task_results = deploy(
-    git_password = sys.argv[1],
-    container_image_address = sys.argv[2]
+task_results = update_yaml_in_repo(
+        file='charts/reference-quarkus-mvn-deploy/values-DEV.yaml',
+        new_value=sys.argv[2],
+        git_password=sys.argv[1],
+        git_email='tekton@example.com',
+        git_name='Tekton',
+        git_username='dwinchell-robot',
+        repo='https://github.com/dwinchell-robot/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git',
+        branch='main',
+        yq_path='.image.tag',
 )
+
 print(task_results)
