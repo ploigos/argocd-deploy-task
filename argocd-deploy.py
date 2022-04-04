@@ -124,6 +124,56 @@ def clone_repo( # pylint: disable=too-many-arguments
     return repo_dir
 
 
+def _update_yaml_file_value(self, file, yq_path, value):
+    """Update a YAML file using YQ.
+
+    Parameters
+    ----------
+    file : str
+        Path to file to update.
+    yq_path : str
+        YQ path to the value to update.
+    value: str
+        value to update the `yq_path`
+
+    Returns
+    -------
+    str
+        Path to the file to update.
+
+    Raises
+    ------
+    StepRunnerException
+        If error updating file.
+    """
+    # NOTE: use a YQ script to update so that comment can be injected
+    yq_script_file = self.write_working_file(
+        filename='update-yaml-file-yq-script.yaml',
+        contents=bytes(
+            f"- command: update\n"
+            f"  path: {yq_path}\n"
+            f"  value:\n"
+            f"    {value} # written by ploigos-step-runner\n",
+            'utf-8'
+        )
+    )
+
+    # inplace update the file
+    try:
+        sh.yq.write( # pylint: disable=no-member
+            file,
+            f'--script={yq_script_file}',
+            '--inplace'
+        )
+    except sh.ErrorReturnCode as error:
+        raise (
+            f"Error updating YAML file ({file}) target ({yq_path}) with value ({value}):"
+            f" {error}"
+        )
+
+    return file
+
+
 def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
     results = {}
@@ -150,6 +200,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     environment = 'DEV'
 
     results['argocd-app-name'] = 'argocd_app_name'
+    results['container-image-deployed-address'] = container_image_address
 
     try:
 
@@ -173,16 +224,10 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
             deployment_config_helm_chart_path,
             deployment_config_helm_chart_environment_values_file
         )
-        container_image_address = container_image_address
-        self._update_yaml_file_value(
+        _update_yaml_file_value(
             file=deployment_config_helm_chart_environment_values_file_path,
             yq_path=deployment_config_helm_chart_values_file_container_image_address_yq_path,
             value=container_image_address
-        )
-        step_result.add_artifact(
-            name='container-image-deployed-address',
-            value=container_image_address,
-            description='Container image address used to deploy the container.'
         )
 
         print("Commit the updated environment values file")
