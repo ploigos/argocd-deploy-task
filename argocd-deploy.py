@@ -236,10 +236,10 @@ def _git_commit_file(git_commit_message, file_path, repo_dir):
         )
     except sh.ErrorReturnCode as error:
         # NOTE: this should never happen
-        raise (
+        raise RuntimeError(
             f"Unexpected error commiting file ({file_path})"
             f" in git repository ({repo_dir}): {error}"
-        )
+        ) from error
 
 
 def _git_push(repo_dir, tag, url=None):
@@ -732,8 +732,8 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     argocd_app_name = 'tekton-task-app'
     container_image_address = 'myimage:newsha'
 
-    git_email = ''
-    git_name = ''
+    git_email = 'tektondeploytask@example.com'
+    git_name = 'Tekton Deploy Task'
     git_username = ''
     git_password = ''
 
