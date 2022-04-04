@@ -4,6 +4,7 @@ import sys
 import re
 from io import StringIO
 import yaml
+from pathlib import Path
 
 
 GIT_REPO_REGEX = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)")
@@ -19,7 +20,7 @@ MAX_ATTEMPT_TO_WAIT_FOR_ARGOCD_OP_RETRIES = 2
 MAX_ATTEMPT_TO_WAIT_FOR_ARGOCD_HEALTH_RETRIES = 2
 
 
-def create_working_dir_sub_dir(self, sub_dir_relative_path=""):
+def create_working_dir_sub_dir(work_dir_path, sub_dir_relative_path=""):
     """Create a folder under the working/stepname folder.
 
     Returns
@@ -27,7 +28,7 @@ def create_working_dir_sub_dir(self, sub_dir_relative_path=""):
     str
         Path to created working sub directory.
     """
-    file_path = os.path.join(self.work_dir_path, sub_dir_relative_path)
+    file_path = os.path.join(work_dir_path, sub_dir_relative_path)
     os.makedirs(file_path, exist_ok=True)
     return file_path
 
@@ -139,7 +140,36 @@ def clone_repo( # pylint: disable=too-many-arguments
     return repo_dir
 
 
-def _update_yaml_file_value(self, file, yq_path, value):
+def write_working_file(work_dir_path, filename, contents=None):
+    """Write content or touch filename in working directory for this step.
+
+    Parameters
+    ----------
+    filename : str
+        File name to create
+    contents : str, optional
+        Contents to write to the file
+
+    Returns
+    -------
+    str
+        Return a string to the file path
+    """
+    # eg: step-runner-working/step_name
+    file_path = os.path.join(work_dir_path, filename)
+
+    # sub-directories might be passed filename, eg: foo/filename
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+    if contents is None:
+        Path(file_path).touch()
+    else:
+        with open(file_path, 'wb') as file:
+            file.write(contents)
+    return file_path
+
+
+def _update_yaml_file_value(work_dir_path, file, yq_path, value):
     """Update a YAML file using YQ.
 
     Parameters
@@ -162,7 +192,8 @@ def _update_yaml_file_value(self, file, yq_path, value):
         If error updating file.
     """
     # NOTE: use a YQ script to update so that comment can be injected
-    yq_script_file = self.write_working_file(
+    yq_script_file = write_working_file(
+        work_dir_path= work_dir_path,
         filename='update-yaml-file-yq-script.yaml',
         contents=bytes(
             f"- command: update\n"
@@ -728,6 +759,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     argocd_sync_timeout_seconds=60
     argocd_sync_retry_limit=20
     argocd_sync_prune=False
+    work_dir_path = '.'
 
     results['argocd-app-name'] = 'argocd_app_name'
     results['container-image-deployed-address'] = container_image_address
@@ -736,7 +768,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
         # clone the configuration repository
         print("Clone the configuration repository")
-        repo_dir = create_working_dir_sub_dir('deployment-config-repo')
+        repo_dir = create_working_dir_sub_dir('.', 'deployment-config-repo')
         deployment_config_repo_dir = clone_repo(
             repo_dir= repo_dir,
             repo_url=deployment_config_repo,
@@ -755,6 +787,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
             deployment_config_helm_chart_environment_values_file
         )
         _update_yaml_file_value(
+            work_dir_path = work_dir_path,
             file=deployment_config_helm_chart_environment_values_file_path,
             yq_path=deployment_config_helm_chart_values_file_container_image_address_yq_path,
             value=container_image_address
