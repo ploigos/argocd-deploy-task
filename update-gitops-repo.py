@@ -2,22 +2,9 @@ import os
 import sh
 import sys
 import re
-from io import StringIO
-import yaml
-from pathlib import Path
 
 
 GIT_REPO_REGEX = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)")
-ARGOCD_OP_IN_PROGRESS_REGEX = re.compile(
-    r'.*FailedPrecondition.*another\s+operation\s+is\s+already\s+in\s+progress',
-    re.DOTALL
-)
-ARGOCD_HEALTH_STATE_TRANSITIONED_FROM_HEALTHY_TO_DEGRADED = re.compile(
-    r".*level=fatal.*health\s+state\s+has\s+transitioned\s+from\s.+\s+to\s+Degraded",
-    re.DOTALL
-)
-MAX_ATTEMPT_TO_WAIT_FOR_ARGOCD_OP_RETRIES = 2
-MAX_ATTEMPT_TO_WAIT_FOR_ARGOCD_HEALTH_RETRIES = 2
 
 
 def create_working_dir_sub_dir(work_dir_path, sub_dir_relative_path=""):
@@ -138,35 +125,6 @@ def clone_repo( # pylint: disable=too-many-arguments
         )
 
     return repo_dir
-
-
-def write_working_file(work_dir_path, filename, contents=None):
-    """Write content or touch filename in working directory for this step.
-
-    Parameters
-    ----------
-    filename : str
-        File name to create
-    contents : str, optional
-        Contents to write to the file
-
-    Returns
-    -------
-    str
-        Return a string to the file path
-    """
-    # eg: step-runner-working/step_name
-    file_path = os.path.join(work_dir_path, filename)
-
-    # sub-directories might be passed filename, eg: foo/filename
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-    if contents is None:
-        Path(file_path).touch()
-    else:
-        with open(file_path, 'wb') as file:
-            file.write(contents)
-    return file_path
 
 
 def _update_yaml_file_value(work_dir_path, file, yq_path, value):
@@ -298,32 +256,20 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
     # get input
     deployment_config_repo = 'https://github.com/dwinchell-robot/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git'
     deployment_config_repo_branch = 'main'
-    deployment_config_helm_chart_path = 'charts/reference-quarkus-mvn-deploy'
-    deployment_config_destination_cluster_uri = 'https://kubernetes.default.svc'
-    deployment_config_destination_cluster_token = '' # self.get_value('kube-api-token')
-    deployment_config_helm_chart_environment_values_file = 'values-DEV.yaml'
+    target_file = 'charts/reference-quarkus-mvn-deploy/values-DEV.yaml'
     deployment_config_helm_chart_values_file_container_image_address_yq_path = '.image.tag'
-    deployment_config_helm_chart_additional_value_files = ''
-    additional_helm_values_files = ''
-    argocd_app_name = 'tekton-task-app'
-    # container_image_address = 'myimage:newsha' # Function parameter
 
-    git_email = 'tektondeploytask@example.com'
-    git_name = 'Tekton Deploy Task'
+    git_email = 'tekton@example.com'
+    git_name = 'Tekton'
     git_username = 'dwinchell-robot'
-    # git_password = git_password // Function argument
-
-    environment = 'DEV'
 
     work_dir_path = '.'
-
-    results['container-image-deployed-address'] = container_image_address
 
     try:
 
         # clone the configuration repository
         print("Clone the configuration repository")
-        repo_dir = create_working_dir_sub_dir('.', 'deployment-config-repo')
+        repo_dir = create_working_dir_sub_dir(work_dir_path, 'deployment-config-repo')
         deployment_config_repo_dir = clone_repo(
             repo_dir= repo_dir,
             repo_url=deployment_config_repo,
@@ -338,8 +284,7 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
         print("Update the environment values file")
         deployment_config_helm_chart_environment_values_file_path = os.path.join(
             deployment_config_repo_dir,
-            deployment_config_helm_chart_path,
-            deployment_config_helm_chart_environment_values_file
+            target_file
         )
         _update_yaml_file_value(
             work_dir_path = work_dir_path,
@@ -350,11 +295,8 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
 
         print("Commit the updated environment values file")
         _git_commit_file(
-            git_commit_message=f'Updating values for deployment to {environment}',
-            file_path=os.path.join(
-                deployment_config_helm_chart_path,
-                deployment_config_helm_chart_environment_values_file
-            ),
+            git_commit_message=f'Updating values for deployment',
+            file_path=target_file,
             repo_dir=deployment_config_repo_dir
         )
         print("Push the updated environment values file")
@@ -369,8 +311,7 @@ def deploy(git_password, container_image_address):  # pylint: disable=too-many-l
 
     except RuntimeError as error:
         results['success'] = False
-        results['message'] = f"Error deploying to environment ({environment}):" \
-                              f" {str(error)}"
+        results['message'] = f"Error updating gitops repository {str(error)}"
 
     return results
 
