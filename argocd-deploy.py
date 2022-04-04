@@ -140,6 +140,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     force_push_tags = 'true'
     additional_helm_values_files = ''
     argocd_app_name = 'tekton-task-app'
+    container_image_address = ''
 
     git_email = ''
     git_name = ''
@@ -172,7 +173,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
             deployment_config_helm_chart_path,
             deployment_config_helm_chart_environment_values_file
         )
-        container_image_address = self._get_deploy_time_container_image_address()
+        container_image_address = container_image_address
         self._update_yaml_file_value(
             file=deployment_config_helm_chart_environment_values_file_path,
             yq_path=deployment_config_helm_chart_values_file_container_image_address_yq_path,
