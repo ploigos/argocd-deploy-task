@@ -3,6 +3,7 @@ import sh
 import sys
 import re
 
+GIT_REPO_REGEX = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)")
 
 def create_working_dir_sub_dir(self, sub_dir_relative_path=""):
     """Create a folder under the working/stepname folder.
@@ -52,7 +53,7 @@ def clone_repo( # pylint: disable=too-many-arguments
     * if error checking out branch of repository
     * if error configuring repo user
     """
-    repo_match = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)").match(repo_url)
+    repo_match = GIT_REPO_REGEX.match(repo_url)
     repo_protocol = repo_match.groupdict()['protocol']
     repo_address = repo_match.groupdict()['address']
     # if deployment config repo uses http/https push using user/pass
@@ -174,6 +175,87 @@ def _update_yaml_file_value(self, file, yq_path, value):
     return file
 
 
+def _git_commit_file(git_commit_message, file_path, repo_dir):
+    try:
+        sh.git.add( # pylint: disable=no-member
+            file_path,
+            _cwd=repo_dir,
+            _out=sys.stdout,
+            _err=sys.stderr
+        )
+    except sh.ErrorReturnCode as error:
+        # NOTE: this should never happen
+        raise (
+            f"Unexpected error adding file ({file_path}) to commit"
+            f" in git repository ({repo_dir}): {error}"
+        )
+
+    try:
+        sh.git.commit( # pylint: disable=no-member
+            '--allow-empty',
+            '--all',
+            '--message', git_commit_message,
+            _cwd=repo_dir,
+            _out=sys.stdout,
+            _err=sys.stderr
+        )
+    except sh.ErrorReturnCode as error:
+        # NOTE: this should never happen
+        raise (
+            f"Unexpected error commiting file ({file_path})"
+            f" in git repository ({repo_dir}): {error}"
+        )
+
+
+def _git_push(repo_dir, tag, url=None):
+    """
+    Raises string if error pushing commits
+    """
+
+    git_push = sh.git.push.bake(url) if url else sh.git.push
+
+    # push commits
+    try:
+        git_push(
+            _cwd=repo_dir,
+            _out=sys.stdout
+        )
+    except sh.ErrorReturnCode as error:
+        raise (
+            f"Error pushing commits from repository directory ({repo_dir}) to"
+            f" repository ({url}): {error}"
+        )
+
+
+def _git_push_deployment_config_repo(
+        deployment_config_repo,
+        deployment_config_repo_dir,
+        username,
+        password
+):
+    deployment_config_repo_match = GIT_REPO_REGEX.match(deployment_config_repo)
+    deployment_config_repo_protocol = deployment_config_repo_match.groupdict()['protocol']
+    deployment_config_repo_address = deployment_config_repo_match.groupdict()['address']
+
+    # if deployment config repo uses http/https push using user/pass
+    # else push using ssh
+    if deployment_config_repo_protocol and re.match(
+            r'^http://|^https://',
+            deployment_config_repo_protocol
+    ):
+        deployment_config_repo_with_user_pass = \
+            f"{deployment_config_repo_protocol}{username}:{password}" \
+            f"@{deployment_config_repo_address}"
+        _git_push(
+            repo_dir=deployment_config_repo_dir,
+            url=deployment_config_repo_with_user_pass
+        )
+    else:
+        _git_push(
+            repo_dir=deployment_config_repo_dir
+        )
+
+
 def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
     results = {}
@@ -231,7 +313,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
         )
 
         print("Commit the updated environment values file")
-        self._git_commit_file(
+        _git_commit_file(
             git_commit_message=f'Updating values for deployment to {self.environment}',
             file_path=os.path.join(
                 deployment_config_helm_chart_path,
@@ -239,18 +321,14 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
             ),
             repo_dir=deployment_config_repo_dir
         )
-        print("Tag and push the updated environment values file")
-        deployment_config_repo_tag = self._get_deployment_config_repo_tag()
-        self._git_tag_and_push_deployment_config_repo(
+        print("Push the updated environment values file")
+        deployment_config_repo_tag = 'DO NOT USE'
+        _git_push_deployment_config_repo(
             deployment_config_repo=deployment_config_repo,
-            deployment_config_repo_dir=deployment_config_repo_dir,
-            deployment_config_repo_tag=deployment_config_repo_tag,
-            force_push_tags=force_push_tags
+            deployment_config_repo_dir=deployment_config_repo_dir
         )
-        step_result.add_artifact(
-            name='config-repo-git-tag',
-            value=deployment_config_repo_tag
-        )
+        # TODO: capture pushed commit hash in results
+
 
         # create/update argocd app and sync it
         print("Sign into ArgoCD")
