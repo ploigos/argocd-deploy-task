@@ -707,7 +707,6 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     deployment_config_helm_chart_environment_values_file = 'values-DEV.yaml'
     deployment_config_helm_chart_values_file_container_image_address_yq_path = 'image.tag'
     deployment_config_helm_chart_additional_value_files = ''
-    force_push_tags = 'true'
     additional_helm_values_files = ''
     argocd_app_name = 'tekton-task-app'
     container_image_address = ''
@@ -842,5 +841,5 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
 
 # Run the script
-results = deploy()
-print(results)
+task_results = deploy()
+print(task_results)
