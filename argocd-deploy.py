@@ -242,7 +242,7 @@ def _git_commit_file(git_commit_message, file_path, repo_dir):
         ) from error
 
 
-def _git_push(repo_dir, tag, url=None):
+def _git_push(repo_dir, url=None):
     """
     Raises string if error pushing commits
     """
@@ -715,12 +715,12 @@ def _argocd_get_app_manifest(
     return argocd_app_manifest_file
 
 
-def deploy():  # pylint: disable=too-many-locals, too-many-statements
+def deploy(git_password):  # pylint: disable=too-many-locals, too-many-statements
 
     results = {}
 
     # get input
-    deployment_config_repo = 'http://gitea.tssc.rht-set.com/ploigos-reference-applications/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git'
+    deployment_config_repo = 'https://github.com/dwinchell-robot/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git'
     deployment_config_repo_branch = 'main'
     deployment_config_helm_chart_path = 'charts/reference-quarkus-mvn-deploy'
     deployment_config_destination_cluster_uri = 'https://kubernetes.default.svc'
@@ -734,8 +734,8 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
     git_email = 'tektondeploytask@example.com'
     git_name = 'Tekton Deploy Task'
-    git_username = ''
-    git_password = ''
+    git_username = 'dwinchell-robot'
+    # git_password = git_password // Function argument
 
     environment = 'DEV'
 
@@ -796,7 +796,9 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
         deployment_config_repo_tag = 'DO NOT USE'
         _git_push_deployment_config_repo(
             deployment_config_repo=deployment_config_repo,
-            deployment_config_repo_dir=deployment_config_repo_dir
+            deployment_config_repo_dir=deployment_config_repo_dir,
+            username=git_username,
+            password=git_password
         )
         # TODO: capture pushed commit hash in results
 
@@ -864,5 +866,7 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
 
 # Run the script
-task_results = deploy()
+task_results = deploy(
+    git_password = sys.argv[1]
+)
 print(task_results)
