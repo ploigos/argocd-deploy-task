@@ -1,36 +1,23 @@
-def _run_step(self):  # pylint: disable=too-many-locals, too-many-statements
-    """Runs the step implemented by this StepImplementer.
+def deploy():  # pylint: disable=too-many-locals, too-many-statements
 
-    Returns
-    -------
-    StepResult
-        Object containing the dictionary results of this step.
-    """
-    step_result = StepResult.from_step_implementer(self)
+    results = {}
 
     # get input
-    deployment_config_repo = self.get_value('deployment-config-repo')
-    deployment_config_repo_branch = self._get_repo_branch()
-    deployment_config_helm_chart_path = self.get_value('deployment-config-helm-chart-path')
-    deployment_config_destination_cluster_uri = self.get_value('kube-api-uri')
-    deployment_config_destination_cluster_token = self.get_value('kube-api-token')
-    deployment_config_helm_chart_environment_values_file = \
-        self._get_deployment_config_helm_chart_environment_values_file()
-    deployment_config_helm_chart_values_file_container_image_address_yq_path = self.get_value([
-        'deployment-config-helm-chart-values-file-container-image-address-yq-path',
-        'deployment-config-helm-chart-values-file-image-tag-yq-path'
-    ])
-    deployment_config_helm_chart_additional_value_files = \
-        self.get_value('deployment-config-helm-chart-additional-values-files')
-    force_push_tags = self.get_value('force-push-tags')
-    additional_helm_values_files = self.get_value('additional-helm-values-files')
+    deployment_config_repo = 'http://gitea.tssc.rht-set.com/ploigos-reference-applications/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git'
+    deployment_config_repo_branch = 'main'
+    deployment_config_helm_chart_path = 'charts/reference-quarkus-mvn-deploy'
+    deployment_config_destination_cluster_uri = 'https://kubernetes.default.svc'
+    deployment_config_destination_cluster_token = '' # self.get_value('kube-api-token')
+    deployment_config_helm_chart_environment_values_file = 'values-DEV.yaml'
+    deployment_config_helm_chart_values_file_container_image_address_yq_path = 'image.tag'
+    deployment_config_helm_chart_additional_value_files = ''
+    force_push_tags = 'true'
+    additional_helm_values_files = ''
+
+    argocd_app_name = 'tekton-task-app'
+    results['argocd-app-name'] = 'argocd_app_name'
 
     try:
-        argocd_app_name = self._get_app_name()
-        step_result.add_artifact(
-            name='argocd-app-name',
-            value=argocd_app_name
-        )
 
         # clone the configuration repository
         print("Clone the configuration repository")
@@ -166,3 +153,6 @@ def _run_step(self):  # pylint: disable=too-many-locals, too-many-statements
                               f" {str(error)}"
 
     return step_result
+
+
+deploy()
