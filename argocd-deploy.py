@@ -192,23 +192,13 @@ def _update_yaml_file_value(work_dir_path, file, yq_path, value):
         If error updating file.
     """
     # NOTE: use a YQ script to update so that comment can be injected
-    yq_script_file = write_working_file(
-        work_dir_path= work_dir_path,
-        filename='update-yaml-file-yq-script.yaml',
-        contents=bytes(
-            f"- command: update\n"
-            f"  path: {yq_path}\n"
-            f"  value:\n"
-            f"    {value} # written by ploigos-step-runner\n",
-            'utf-8'
-        )
-    )
+    # TODO: update to YQ 4 and drop script file (and associated python parameters)
 
     # inplace update the file
     try:
-        sh.yq.write( # pylint: disable=no-member
+        sh.yq.eval( # pylint: disable=no-member
+            f'{yq_path} = "{value}"',
             file,
-            f'--script={yq_script_file}',
             '--inplace'
         )
     except sh.ErrorReturnCode as error:
@@ -736,11 +726,11 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     deployment_config_destination_cluster_uri = 'https://kubernetes.default.svc'
     deployment_config_destination_cluster_token = '' # self.get_value('kube-api-token')
     deployment_config_helm_chart_environment_values_file = 'values-DEV.yaml'
-    deployment_config_helm_chart_values_file_container_image_address_yq_path = 'image.tag'
+    deployment_config_helm_chart_values_file_container_image_address_yq_path = '.image.tag'
     deployment_config_helm_chart_additional_value_files = ''
     additional_helm_values_files = ''
     argocd_app_name = 'tekton-task-app'
-    container_image_address = ''
+    container_image_address = 'myimage:newsha'
 
     git_email = ''
     git_name = ''
