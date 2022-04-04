@@ -13,8 +13,10 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
     deployment_config_helm_chart_additional_value_files = ''
     force_push_tags = 'true'
     additional_helm_values_files = ''
-
     argocd_app_name = 'tekton-task-app'
+
+    environment = 'DEV'
+
     results['argocd-app-name'] = 'argocd_app_name'
 
     try:
@@ -147,12 +149,12 @@ def deploy():  # pylint: disable=too-many-locals, too-many-statements
             name='deployed-host-urls',
             value=deployed_host_urls
         )
-    except StepRunnerException as error:
-        step_result.success = False
-        step_result.message = f"Error deploying to environment ({self.environment}):" \
+    except RuntimeError as error:
+        results['success'] = False
+        results['message'] = f"Error deploying to environment ({environment}):" \
                               f" {str(error)}"
 
-    return step_result
+    return results
 
 
 deploy()
