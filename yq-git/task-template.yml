@@ -18,4 +18,4 @@ spec:
       workingDir: /workspace/clone
       script: |
         #!/usr/bin/python3
-        print('hello')
+        ### BUILD SCRIPT WILL INSERT CODE HERE ###

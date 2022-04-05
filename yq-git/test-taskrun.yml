@@ -7,7 +7,7 @@ spec:
     name: yq-git
   params:
     - name: git-password
-      value: 
+      value:
     - name: new-value
       value: newvalue1
   workspaces:
