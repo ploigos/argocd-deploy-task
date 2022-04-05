@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: yq-git
+spec:
+  workspaces:
+    - name: clone
+  params:
+    - name: git-password
+      description: The password to authenticate with the git repository
+      type: string
+    - name: new-value
+      description: Set this value at the specified path in the target file
+      type: string
+  steps:
+    - name: yq-git
+      image: quay.io/dwinchell_redhat/yq-git-ubi8:latest
+      workingDir: /workspace/clone
+      script: |
+        #!/usr/bin/python3
+        print('hello')
