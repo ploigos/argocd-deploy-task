@@ -16,6 +16,11 @@ spec:
     - name: yq-git
       image: quay.io/dwinchell_redhat/yq-git-ubi8:latest
       workingDir: /workspace/clone
+      env:
+        - name: GIT_PASSWORD
+          value: $(params.git-password)
+        - name: NEW_VALUE
+          value: $(params.new-value)
       script: |
         #!/usr/bin/python3
         ### BUILD SCRIPT WILL INSERT CODE HERE ###

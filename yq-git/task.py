@@ -1,7 +1,7 @@
 import os
+import re
 import sh
 import sys
-import re
 
 GIT_REPO_REGEX = re.compile(r"(?P<protocol>^https:\/\/|^http:\/\/)?(?P<address>.*$)")
 
@@ -281,8 +281,8 @@ def update_yaml_in_repo(
 # Run the script
 task_results = update_yaml_in_repo(
         file='charts/reference-quarkus-mvn-deploy/values-DEV.yaml',
-        new_value=sys.argv[2],
-        git_password=sys.argv[1],
+        new_value=os.environ.get('NEW_VALUE'),
+        git_password=os.environ.get('GIT_PASSWORD'),
         git_email='tekton@example.com',
         git_name='Tekton',
         git_username='dwinchell-robot',

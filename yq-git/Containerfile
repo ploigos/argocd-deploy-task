@@ -1,12 +1,14 @@
-FROM ubi8/python-39:latest
+FROM ubi8/ubi:latest
 
 ENV YQ_VERSION=v4.23.1
 ENV YQ_BINARY=yq_linux_amd64
 
 USER 0
-# RUN dnf install -y git wget python39 # already installed in ubi8/python-39
-RUN wget https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}.tar.gz -O - |\
-    tar xz && mv ${YQ_BINARY} /usr/bin/yq
-USER 1001
+RUN dnf install -y git python39 wget && \
+    dnf clean all && \
+    rm -rf /var/cache /var/log/dnf* /var/log/yum.* && \
+    python3 -m pip install --no-cache-dir sh && \
+    wget https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}.tar.gz -O - |\
+        tar xz && mv ${YQ_BINARY} /usr/bin/yq
 
-RUN python3 -m pip install --no-cache-dir sh
+USER 1001
