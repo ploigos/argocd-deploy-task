@@ -292,3 +292,6 @@ task_results = update_yaml_in_repo(
 )
 
 print(task_results)
+
+if task_results['success'] == False:
+    sys.exit(1)
