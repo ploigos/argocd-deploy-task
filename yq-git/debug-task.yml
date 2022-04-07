@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: debug
+spec:
+  workspaces:
+  params:
+  steps:
+    - name: debug
+      image: quay.io/dwinchell_redhat/yq-git-ubi8:latest
+      workingDir: /workspace/clone
+      env:
+      script: |
+        #!/usr/bin/sh
+        set -x
+        git clone https://github.com/dwinchell-robot/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git
+        #cat ~/.git-credentials
+        cd reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal
+        echo baz > bar
+        git config --global user.email "dillon@redhat.com"
+        git config --global user.name "Dillon Winchell"
+        git add bar
+        git commit -am "Another change"
+        git push origin main
