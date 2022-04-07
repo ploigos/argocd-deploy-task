@@ -238,9 +238,9 @@ def update_yaml_in_repo(
             repo_url=repo,
             repo_branch=branch,
             git_email=git_email,
-            git_name=git_name,
-            username=git_username,
-            password=git_password
+            git_name=git_name #,
+            # username=git_username,
+            # password=git_password
         )
 
         # update values file, commit it, push it, and tag it

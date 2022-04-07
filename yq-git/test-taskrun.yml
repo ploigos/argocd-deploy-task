@@ -6,8 +6,8 @@ spec:
   taskRef:
     name: yq-git
   params:
-    - name: git-password
-      value:
+#    - name: git-password
+#      value:
     - name: new-value
       value: newvalue1
   workspaces:

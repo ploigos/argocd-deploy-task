@@ -7,7 +7,8 @@ spec:
     - name: clone
   params:
     - name: git-password
-      description: The password to authenticate with the git repository
+      description: The password to authenticate with the git repository, if using HTTPS and basic authentication.
+      default: ''
       type: string
     - name: new-value
       description: Set this value at the specified path in the target file
