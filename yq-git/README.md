@@ -40,3 +40,8 @@ podman push yq-git-ubi8 quay.io/dwinchell_redhat/yq-git-ubi8
    ```shell
     oc secret link pipeline ops-repo-auth
     ```
+
+3. Manual test
+```shell
+oc apply -f shell-task.yml && tkn task start shell-yq -p file=charts/reference-quarkus-mvn-deploy/values-DEV.yaml -p yqPath=.image.tag -p value=shell4 -p gitName=Tekton -p gitEmail=tekton@example.com -p "commitMessage=Updated the file" -p gitRepo=https://github.com/dwinchell-robot/reference-quarkus-mvn-cloud-resources_tekton_workflow-minimal.git -p branch=newBranch && tkn taskrun logs -f --last
+```
