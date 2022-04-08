@@ -32,7 +32,7 @@ spec:
     - name: commitHash
       description: The hash of the new git commit that this task created, if one was created.
   steps:
-    - name: debug
+    - name: yq-git
       image: quay.io/dwinchell_redhat/yq-git-ubi8:latest
       workingDir: /workspace/clone
       env:
